@@ -1,0 +1,58 @@
+steps:
+    - name: 'gcr.io/cloud-builders/gcloud'
+ #     secretEnv: ['SSH_KEY']
+      entrypoint: 'bash'
+      args:
+      - -c
+      - |
+        gcloud secrets versions access latest --secret=id_rsa > /root/.ssh/id_rsa
+        gcloud secrets versions access latest --secret=builder_svc_account > /root/.ssh/svc_account.json
+        ssh-keyscan github.com > /root/.ssh/known_hosts
+        chmod 400 /root/.ssh/id_rsa /root/.ssh/known_hosts    
+      volumes:
+      - name: 'ssh'
+        path: /root/.ssh
+ # [Start tf-init]       
+    - id: 'tf init'
+      name: 'gcr.io/terraform-pipeline-302508/terraform'
+      entrypoint: 'sh'
+      args: 
+      - '-c'
+      - |
+          cd ${_PROJECT_FOLDER}
+          terraform init
+      volumes:
+      - name: 'ssh'
+        path: /root/.ssh
+      env:
+      - 'GOOGLE_APPLICATION_CREDENTIALS=/root/.ssh/svc_account.json'
+
+  # [Start tf-plan]      
+    - id: 'tf plan'
+      name: 'gcr.io/terraform-pipeline-302508/terraform'
+      entrypoint: 'sh'
+      args:
+      - '-c'
+      - |
+          cd ${_PROJECT_FOLDER}
+          terraform plan -var-file=pr.tfvars
+      volumes:
+      - name: 'ssh'
+        path: /root/.ssh    
+      env:
+      - 'GOOGLE_APPLICATION_CREDENTIALS=/root/.ssh/svc_account.json'
+
+    # # [START tf-apply]
+    # - id: 'tf apply'
+    #   name: 'gcr.io/terraform-pipeline-302508/terraform'
+    #   entrypoint: 'sh'
+    #   args: 
+    #   - '-c'
+    #   - |
+    #       terraform apply -auto-approve
+    #   volumes:
+    #   - name: 'ssh'
+    #     path: /root/.ssh
+    #   env:
+    #   - 'GOOGLE_APPLICATION_CREDENTIALS=/root/.ssh/svc_account.json'
+    # # [END tf-apply] 
